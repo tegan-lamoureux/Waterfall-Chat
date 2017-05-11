@@ -16,5 +16,8 @@ public class Manager {
         for(int i = 0; i < number_of_clients; ++i)
             test_clients[i] = new Client(test_server.connect());
 
+        for(int i = 0; i < number_of_clients; ++i)
+            if(!test_server.disconnect(test_clients[i].get_my_id()))
+                System.out.println("Disconnect error.");
     }
 }

@@ -7,6 +7,9 @@ import java.util.Vector;
 public class Server {
     private Vector<Integer> connected_clients = new Vector<>();
 
+    // Will "connect" a client to the server. What this entails is finding a unique 6-digit client ID and
+    // adding that client ID to a list of "connected clients". It also returns the client ID, which the client
+    // should keep and set internally for future communication with the server.
     public int connect(){
         Random random = new Random();
 
@@ -30,5 +33,18 @@ public class Server {
             connected_clients.add(client_id);
 
         return client_id;
+    }
+
+    public boolean disconnect(int client_id){
+        boolean found = false;
+
+        for(int i = 0; i < connected_clients.size(); ++i){
+            if(connected_clients.get(i) == client_id){
+                found = true;
+                connected_clients.remove(i);
+            }
+        }
+
+        return found;
     }
 }

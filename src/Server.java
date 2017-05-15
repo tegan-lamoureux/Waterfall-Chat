@@ -40,19 +40,40 @@ public class Server {
         public String get_username(){
             return username;
         }
+
+        public boolean connect(int client_id){
+            if(client_id > 0){
+                this.client_id = client_id;
+                this.logged_in = true;
+
+                return true;
+            }
+            else
+                return false;
+        }
     }
 
+    // TODO: Write these to file and read in on shutdown/startup.
     private Vector<Integer> connected_clients = new Vector<>();
+
+    // TODO: fix this, maybe convert to hash table
     private Vector<User> user_list = new Vector<>();
 
-    public boolean check_user_exists(String username){
-        boolean user_found = false;
+    // converted to int instead of bool, update required code
+    public int check_client_connected(int client_id){
+        for(int i: connected_clients)
+            if(i == client_id)
+                return i;
 
-        for(User single: user_list)
-            if(single.get_username().equals(username))
-                user_found = true;
+        return -1;
+    }
 
-        return user_found;
+    public int check_user_exists(String username){
+        for(int i = 0; i < user_list.size(); ++i)
+            if(user_list.get(i).get_username().equals(username))
+                return i;
+
+        return -1;
     }
 
     public boolean create_user_account(String username, String password){
@@ -64,8 +85,16 @@ public class Server {
             return false;
     }
 
-    public boolean login(){
-        return false;
+    public boolean login(int client_id, String username){
+        int user = this.check_user_exists(username);
+        int client = this.check_client_connected(client_id);
+
+        if(user != -1 && client != -1){
+            user_list.get(user).connect(client_id);
+            return true;
+        }
+        else
+            return false;
     }
 
     // Will "connect" a client to the server. What this entails is finding a unique 6-digit client ID and
@@ -79,12 +108,13 @@ public class Server {
 
         // Loop through all of our connected clients and check to see if the new client ID is unique.
         // If so, great, use it. If not, generate a new one and restart the search.
+        // FIXME: this code looks bad/is awkward. re-write.
         while(!valid_id){
             valid_id = true; // assume validity until proven otherwise
             for (int i: connected_clients) {
                 if (i == client_id) { // if we found a duplicate ID
                     client_id = random.nextInt(999999) + 100000; // generate new ID
-
+                    valid_id = false;
                 }
             }
         }

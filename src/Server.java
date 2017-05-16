@@ -1,3 +1,9 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.Buffer;
+import java.rmi.server.ExportException;
 import java.util.Random;
 import java.util.Vector;
 
@@ -53,6 +59,34 @@ public class Server {
         }
     }
 
+    ServerSocket my_server = null;
+
+    public Server(){
+        try{
+            my_server = new ServerSocket(2000);
+        }
+        catch (Exception e){System.out.println("Server creation error!");}
+
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                boolean kill_server = false;
+
+                while(!kill_server){
+                    // server io here
+                    try {
+                        Socket connection_socket = my_server.accept();
+
+                        BufferedReader in_from_client = new BufferedReader(new InputStreamReader(connection_socket.getInputStream()));
+                    }
+                    catch (Exception e){System.out.println("Socket IO error!");}
+
+                    // parse input from clients here
+                }
+            }
+        };
+    }
+
     // TODO: Write these to file and read in on shutdown/startup.
     private Vector<Integer> connected_clients = new Vector<>();
 
@@ -91,6 +125,7 @@ public class Server {
 
         if(user != -1 && client != -1){
             user_list.get(user).connect(client_id);
+            this.send_all(client_id, user_list.get(user).get_username() + " has signed in!");
             return true;
         }
         else
@@ -136,5 +171,10 @@ public class Server {
         }
 
         return found;
+    }
+
+    public boolean send_all(int client_id, String message){
+        // send a message here
+        return true;
     }
 }

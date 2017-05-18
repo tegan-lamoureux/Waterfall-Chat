@@ -5,9 +5,6 @@ public class Client {
     private boolean connected = false;
     private int my_id = 0;
 
-    public Client(){
-    }
-
     public Client(int client_id){
         this.connect(client_id);
     }

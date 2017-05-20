@@ -1,5 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 
 /**
  * Created by tegan on 5/11/2017.
@@ -11,13 +13,28 @@ public class Client {
     private boolean connected = false;
     private int my_id = 0;
 
+    private class HandleInputEnter implements KeyListener {
+        @Override
+        public void keyPressed(KeyEvent e) {
+            if(e.getKeyChar() == '\n'){
+                e.consume(); // get rid of my return so it doesn't muck up my send field
+                Client.this.send_message();
+            }
+        }
+
+        @Override
+        public void keyReleased(KeyEvent e) {}
+        @Override
+        public void keyTyped(KeyEvent e) {}
+    }
+
     // *** Window stuff.
-    private static JFrame messages_window; // Jframe for main window.
-    private static JTextPane messages_pane; // Main messages pane.
-    private static JTextPane send_pane;     // Text box to send messages.
-    private static JTextPane user_pane;     // User list.
-    private static  JMenuBar main_menu;     // Main menu bar.
-    private static JScrollPane messages_scrolling;
+    private JFrame messages_window; // Jframe for main window.
+    private JTextPane messages_pane; // Main messages pane.
+    private JTextPane send_pane;     // Text box to send messages.
+    private JTextPane user_pane;     // User list.
+    private JMenuBar main_menu;     // Main menu bar.
+    private JScrollPane messages_scrolling;
     // ** End window stuff.
 
     public Client(){
@@ -42,7 +59,7 @@ public class Client {
 
 
         //Create and set up the window.
-        messages_window = new JFrame("Chat Interface Mockup");
+        messages_window = new JFrame("Chat Window");
         messages_window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         //Set up the content pane.
@@ -108,7 +125,7 @@ public class Client {
         if(client_id != -1) {
             connected = true;
             my_id = client_id;
-            System.out.println("Connected! cl_id:" + my_id);
+            this.messages_pane.setText("Connected! cl_id:" + my_id);
         }
         else
             System.out.println("Connect Error!");
@@ -118,8 +135,20 @@ public class Client {
         return my_id;
     }
 
-    public void send_message(String message){
-        // Send message functionality.
+    public void send_message(){
+        String to_send = null;
+
+        if(connected) {
+            to_send = '\n' + send_pane.getText();
+        }
+        else{
+            to_send = "\nPlease connect and login first.";
+        }
+
+        send_pane.setText(""); // Clear my sent message pane.
+        messages_pane.setText(messages_pane.getText() + to_send);
+
+        // TODO: also handle socket send to server here.
     }
 
 }

@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -71,29 +72,32 @@ public class Server {
 
     private ConcurrentHashMap<Integer, String > connected_clients = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, User> user_account_list = new ConcurrentHashMap<>();
+
     private ServerSocket my_server = null;
 
-    public Server(){
+    public Server() {
         try{
             my_server = new ServerSocket(2000);
         }
         catch (Exception e){System.out.println("Server creation error!");}
 
-        Runnable r = new Runnable() {
+        Runnable r = new Runnable(){
             @Override
             public void run() {
                 boolean kill_server = false;
 
-                while(!kill_server){
+                while(!kill_server) {
                     // server io here
                     try {
                         Socket connection_socket = my_server.accept();
 
                         BufferedReader in_from_client = new BufferedReader(new InputStreamReader(connection_socket.getInputStream()));
-                    }
-                    catch (Exception e){System.out.println("Socket IO error!");}
 
-                    // parse input from clients here
+                        System.out.println("SOCKET: " + in_from_client.toString());
+
+                    }catch (IOException e){
+                        System.out.println("IO Exception!");
+                    }
                 }
             }
         };
@@ -138,6 +142,8 @@ public class Server {
                     valid_id = true;
                 }
             }
+
+            System.out.println("Test; clid generated: " + client_id);
 
             // now that we have a valid client id, let's add it to the list of connected clients...
             connected_clients.putIfAbsent(client_id, username);

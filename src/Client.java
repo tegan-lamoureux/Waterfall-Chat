@@ -1,13 +1,19 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.net.Socket;
+import java.security.spec.ECField;
+import java.io.IOException;
 
 /**
  * Created by tegan on 5/11/2017.
  */
-
-// TODO: find out why closing one of multiple clients causes the rest to close as well
 
 public class Client {
     private boolean connected = false;
@@ -29,22 +35,38 @@ public class Client {
     }
 
     // *** Window stuff.
-    private JFrame messages_window; // Jframe for main window.
-    private JTextPane messages_pane; // Main messages pane.
-    private JTextPane send_pane;     // Text box to send messages.
-    private JTextPane user_pane;     // User list.
-    private JMenuBar main_menu;     // Main menu bar.
+    private JFrame messages_window = new JFrame("Chat Window"); // Jframe for main window.
+    private JTextPane messages_pane = new JTextPane(); // Main messages pane.
+    private JTextPane send_pane = new JTextPane();     // Text box to send messages.
+    private JTextPane user_pane = new JTextPane();     // User list.
+    private JMenuBar main_menu = new JMenuBar();     // Main menu bar.
     private JScrollPane messages_scrolling;
     // ** End window stuff.
 
     public Client(){
         //Schedule a job for the event dispatch thread:
         //creating and showing this application's GUI.
+        BufferedReader in_from_server = new BufferedReader(new InputStreamReader(System.in));
+
+        try{
+            Socket client = new Socket("localhost", 2000);
+            DataOutputStream out_to_server = new DataOutputStream(client.getOutputStream());
+        }
+        catch (IOException e){System.out.println("IO Exception!");}
+
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 create_main_window();
             }
         });
+
+        ActionListener server_actions = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                //...check server messages here
+
+            }
+        };
+        new Timer(100, server_actions).start();
     }
 
     public Client(int client_id){
@@ -57,15 +79,12 @@ public class Client {
         // I need a place for login credentials at the top. If valid, logs in, if invalid, shows the new user
         // window signup.
 
-
         //Create and set up the window.
-        messages_window = new JFrame("Chat Window");
-        messages_window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        messages_window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         //Set up the content pane.
         Container pane = messages_window.getContentPane();
 
-        messages_pane = new JTextPane();
         messages_pane.setPreferredSize(new Dimension(450, 300));
         messages_pane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
@@ -73,13 +92,14 @@ public class Client {
                         BorderFactory.createEmptyBorder(5,5,5,5)),
                 messages_pane.getBorder()));
         messages_pane.setEditable(false);
-        messages_pane.setText("Disconnected. Please log in.");
+        if(this.connected == false) {
+            messages_pane.setText("Disconnected. Please log in.");
+        }
         pane.add(messages_pane, BorderLayout.CENTER);
 
         // TODO: working on getting messages pane to scroll correctly.
         messages_window.setPreferredSize(new Dimension(450, 300));
 
-        user_pane = new JTextPane();
         user_pane.setPreferredSize(new Dimension(150, 300));
         user_pane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
@@ -88,7 +108,6 @@ public class Client {
                 user_pane.getBorder()));
         pane.add(user_pane, BorderLayout.LINE_END);
 
-        send_pane = new JTextPane();
         send_pane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createTitledBorder("Input"),
@@ -99,7 +118,6 @@ public class Client {
         send_pane.addKeyListener(new HandleInputEnter());
         pane.add(send_pane, BorderLayout.PAGE_END);
 
-        main_menu = new JMenuBar();
         JMenu file_menu = new JMenu("File");
         JMenuItem login = new JMenuItem("Login");
         JMenuItem exit = new JMenuItem("Exit");
@@ -125,7 +143,10 @@ public class Client {
         if(client_id != -1) {
             connected = true;
             my_id = client_id;
-            this.messages_pane.setText("Connected! cl_id:" + my_id);
+            System.out.println("Connected! cl_id:" + my_id);
+            messages_pane.setText("Connected! cl_id:" + my_id);
+
+
         }
         else
             System.out.println("Connect Error!");

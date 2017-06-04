@@ -1,14 +1,10 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.*;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
-import java.security.spec.ECField;
 import java.io.IOException;
 
 /**
@@ -16,6 +12,9 @@ import java.io.IOException;
  */
 
 public class Client {
+    ////////////////////////////////////////////////////
+    // Private Class Variables   ///////////////////////
+    ////////////////////////////////////////////////////
     private boolean connected = false;
     private int my_id = 0;
 
@@ -34,25 +33,43 @@ public class Client {
         public void keyTyped(KeyEvent e) {}
     }
 
-    // *** Window stuff.
+
+
+    ////////////////////////////////////////////////////
+    // SWING Window Components   ///////////////////////
+    ////////////////////////////////////////////////////
     private JFrame messages_window = new JFrame("Chat Window"); // Jframe for main window.
     private JTextPane messages_pane = new JTextPane(); // Main messages pane.
     private JTextPane send_pane = new JTextPane();     // Text box to send messages.
     private JTextPane user_pane = new JTextPane();     // User list.
     private JMenuBar main_menu = new JMenuBar();     // Main menu bar.
-    private JScrollPane messages_scrolling;
-    // ** End window stuff.
 
-    public Client(){
+
+
+    ////////////////////////////////////////////////////
+    // Client Methods   ////////////////////////////////
+    ////////////////////////////////////////////////////
+
+    public void windowClosed(WindowEvent e){
+        System.exit(0);
+    }
+
+    public Client() throws IOException{
         //Schedule a job for the event dispatch thread:
-        //creating and showing this application's GUI.
-        BufferedReader in_from_server = new BufferedReader(new InputStreamReader(System.in));
+        //creating and showing this application's GUI
 
-        try{
-            Socket client = new Socket("localhost", 2000);
-            DataOutputStream out_to_server = new DataOutputStream(client.getOutputStream());
-        }
-        catch (IOException e){System.out.println("IO Exception!");}
+        String sentence;
+        String modified_sentence;
+        BufferedReader in_from_user = new BufferedReader(new InputStreamReader(System.in));
+
+        Socket socket = new Socket("localhost", 6789);
+        DataOutputStream out_to_server = new DataOutputStream(socket.getOutputStream());
+        BufferedReader in_from_server = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        sentence = in_from_user.readLine();
+        out_to_server.writeBytes(sentence + '\n');
+        modified_sentence = in_from_server.readLine();
+        System.out.println(modified_sentence);
 
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -60,19 +77,16 @@ public class Client {
             }
         });
 
-        ActionListener server_actions = new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                //...check server messages here
-
-            }
-        };
-        new Timer(100, server_actions).start();
+        socket.close();
     }
 
-    public Client(int client_id){
+    public Client(int client_id) throws IOException{
         this();
-
         this.connect(client_id);
+    }
+
+    private void add_message(String message){
+        messages_pane.setText(messages_pane.getText() + "\n" + message);
     }
 
     private void create_main_window(){
@@ -144,9 +158,7 @@ public class Client {
             connected = true;
             my_id = client_id;
             System.out.println("Connected! cl_id:" + my_id);
-            messages_pane.setText("Connected! cl_id:" + my_id);
-
-
+            this.add_message("Connected! cl_id:" + my_id);
         }
         else
             System.out.println("Connect Error!");

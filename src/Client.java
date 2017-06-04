@@ -18,12 +18,16 @@ public class Client {
     private boolean connected = false;
     private int my_id = 0;
 
+    private boolean message_waiting = false;
+    private String message;
+
     private class HandleInputEnter implements KeyListener {
         @Override
         public void keyPressed(KeyEvent e) {
             if(e.getKeyChar() == '\n'){
                 e.consume(); // get rid of my return so it doesn't muck up my send field
-                Client.this.send_message();
+                message_waiting = true;
+                message = messages_pane.getText();
             }
         }
 
@@ -54,30 +58,60 @@ public class Client {
         System.exit(0);
     }
 
-    public Client() throws IOException{
+    public Client() {
         //Schedule a job for the event dispatch thread:
         //creating and showing this application's GUI
 
-        String sentence;
-        String modified_sentence;
-        BufferedReader in_from_user = new BufferedReader(new InputStreamReader(System.in));
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    boolean alive = true;
 
-        Socket socket = new Socket("localhost", 6789);
-        DataOutputStream out_to_server = new DataOutputStream(socket.getOutputStream());
-        BufferedReader in_from_server = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    String sentence;
+                    String modified_sentence;
+                    BufferedReader in_from_user = new BufferedReader(new InputStreamReader(System.in));
 
-        sentence = in_from_user.readLine();
-        out_to_server.writeBytes(sentence + '\n');
-        modified_sentence = in_from_server.readLine();
-        System.out.println(modified_sentence);
+                    Socket socket = new Socket("localhost", 6789);
+                    DataOutputStream out_to_server = new DataOutputStream(socket.getOutputStream());
+                    BufferedReader in_from_server = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                    while (alive) {
+//                        System.out.print("Command : ");
+//                        sentence = in_from_user.readLine();
+
+                        if(message_waiting){
+                            message_waiting = false;
+                            out_to_server.writeBytes(message + '\n');
+                        }
+
+                        switch (in_from_server.readLine()){
+                            case "__user_list":
+                                String name = in_from_server.readLine();
+                                while(!name.equals("__finished")){
+                                    user_pane.setText(user_pane.getText() + name + '\n');
+                                    name = in_from_server.readLine();
+                                }
+                                break;
+
+                            case "__kill":
+                                alive = false;
+                                break;
+                        }
+                    }
+                    socket.close();
+                }
+                catch (Exception e) {}
+            }
+        });
+
+        t.start();
 
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 create_main_window();
             }
         });
-
-        socket.close();
     }
 
     public Client(int client_id) throws IOException{

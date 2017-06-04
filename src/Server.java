@@ -1,3 +1,5 @@
+import com.sun.xml.internal.ws.commons.xmlutil.Converter;
+
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -106,9 +108,30 @@ public class Server {
 
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                in_from_client = in.readLine();
-                in_from_client = "Received:" + in_from_client + '\n';
-                out.writeBytes(in_from_client);
+
+                boolean alive = true;
+
+                while(alive) {
+                    String value = in.readLine();
+                    System.out.println("server: " + value);
+                    switch (value){
+                        case "__get_users":
+                            //System.out.println("in case");
+                            out.writeBytes("__user_list" + '\n');
+
+                            for(String name: connected_clients.values()){
+                                out.writeBytes(name + '\n');
+                                //System.out.println(name);
+                            }
+
+                            out.writeBytes("__finished" + '\n');
+                            break;
+
+                        case "__kill":
+                            alive = false;
+                            break;
+                    }
+                }
             }
             catch(IOException e){}
         }
@@ -117,6 +140,7 @@ public class Server {
     // Main constructor. Contains main server thread/loop.
     public Server() {
         Thread t = new Thread(new Runnable() {
+            @Override
             public void run() {
                 try {
                     my_server = new ServerSocket(6789);

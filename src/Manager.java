@@ -10,7 +10,7 @@ public class Manager {
         Scanner input = new Scanner(System.in);
         Server test_server = new Server();
 
-        System.out.println("How many clients would you like to spawn? : ");
+        System.out.print("How many clients would you like to spawn? : ");
 
         int number_clients = input.nextInt();
 

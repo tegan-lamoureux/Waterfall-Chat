@@ -104,36 +104,35 @@ public class Server {
         public void run (){
             try {
                 // just ping back for now.
-                String in_from_client;
-
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
                 boolean alive = true;
 
                 while(alive) {
-                    String value = in.readLine();
-                    System.out.println("server: " + value);
-                    switch (value){
-                        case "__get_users":
-                            //System.out.println("in case");
-                            out.writeBytes("__user_list" + '\n');
+                    if(in.ready()) {
+                        switch (in.readLine()){
+                            case "__get_users":
+                                //System.out.println("in case");
+                                out.writeBytes("__user_list" + '\n');
 
-                            for(String name: connected_clients.values()){
-                                out.writeBytes(name + '\n');
-                                //System.out.println(name);
-                            }
+                                for(String name: connected_clients.values()){
+                                    out.writeBytes(name + '\n');
+                                    System.out.println(name);
+                                }
 
-                            out.writeBytes("__finished" + '\n');
-                            break;
+                                out.writeBytes("__finished" + '\n');
+                                break;
 
-                        case "__kill":
-                            alive = false;
-                            break;
+                            case "__kill":
+                                alive = false;
+                                break;
+                        }
                     }
+                    Thread.sleep(500);
                 }
             }
-            catch(IOException e){}
+            catch(Exception e){}
         }
     }
 
@@ -150,6 +149,7 @@ public class Server {
                         Socket clientSocket = my_server.accept();
                         Single_Client_Server single = new Single_Client_Server(clientSocket);
                         single.start();
+                        Thread.sleep(500);
                     }
 
                     my_server.close();

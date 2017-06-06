@@ -27,7 +27,8 @@ public class Client {
             if(e.getKeyChar() == '\n'){
                 e.consume(); // get rid of my return so it doesn't muck up my send field
                 message_waiting = true;
-                message = messages_pane.getText();
+                message = send_pane.getText();
+                send_pane.setText("");
             }
         }
 
@@ -42,11 +43,11 @@ public class Client {
     ////////////////////////////////////////////////////
     // SWING Window Components   ///////////////////////
     ////////////////////////////////////////////////////
-    private JFrame messages_window = new JFrame("Chat Window"); // Jframe for main window.
-    private JTextPane messages_pane = new JTextPane(); // Main messages pane.
-    private JTextPane send_pane = new JTextPane();     // Text box to send messages.
-    private JTextPane user_pane = new JTextPane();     // User list.
-    private JMenuBar main_menu = new JMenuBar();     // Main menu bar.
+    private JFrame    messages_window = new JFrame("Chat Window"); // Jframe for main window.
+    private JTextPane messages_pane   = new JTextPane(); // Main messages pane.
+    private JTextPane send_pane       = new JTextPane(); // Text box to send messages.
+    private JTextPane user_pane       = new JTextPane(); // User list.
+    private JMenuBar  main_menu       = new JMenuBar();  // Main menu bar.
 
 
 
@@ -62,42 +63,50 @@ public class Client {
         //Schedule a job for the event dispatch thread:
         //creating and showing this application's GUI
 
-        Thread t = new Thread(new Runnable() {
+        Thread input_from_server_thread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     boolean alive = true;
-
-                    String sentence;
-                    String modified_sentence;
-                    BufferedReader in_from_user = new BufferedReader(new InputStreamReader(System.in));
 
                     Socket socket = new Socket("localhost", 6789);
                     DataOutputStream out_to_server = new DataOutputStream(socket.getOutputStream());
                     BufferedReader in_from_server = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
                     while (alive) {
-//                        System.out.print("Command : ");
-//                        sentence = in_from_user.readLine();
-
                         if(message_waiting){
                             message_waiting = false;
                             out_to_server.writeBytes(message + '\n');
+                            message = "";
+                            System.out.println("Cleared message.");
                         }
 
-                        switch (in_from_server.readLine()){
-                            case "__user_list":
-                                String name = in_from_server.readLine();
-                                while(!name.equals("__finished")){
-                                    user_pane.setText(user_pane.getText() + name + '\n');
-                                    name = in_from_server.readLine();
-                                }
-                                break;
+                        if(in_from_server.ready()) {
+                            switch (in_from_server.readLine()) {
+                                case "__user_list":
+                                    String name = "";
+                                    user_pane.setText("");
 
-                            case "__kill":
-                                alive = false;
-                                break;
+                                    // TODO: add timeout
+                                    while (!name.equals("__finished")) {
+                                        if (in_from_server.ready()) {
+                                            name = in_from_server.readLine();
+                                            if(!name.equals("__finished")) {
+                                                user_pane.setText(user_pane.getText() + name + '\n');
+                                            }
+                                        }
+                                    }
+                                    break;
+
+                                case "__kill":
+                                    alive = false;
+                                    break;
+                            }
                         }
+
+                        Thread.sleep(500);
+
+                        out_to_server.writeBytes("__get_users\n");
                     }
                     socket.close();
                 }
@@ -105,7 +114,7 @@ public class Client {
             }
         });
 
-        t.start();
+        input_from_server_thread.start();
 
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {

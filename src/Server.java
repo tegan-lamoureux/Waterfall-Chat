@@ -30,7 +30,8 @@ public class Server {
     // Main server socket; used when clients connect.
     private ServerSocket my_server = null;
 
-
+    private boolean public_message_ready = false;
+    private String public_message;
 
     ////////////////////////////////////////////////////
     // Private Sub-Classes and Constructors   //////////
@@ -110,6 +111,13 @@ public class Server {
                 boolean alive = true;
 
                 while(alive) {
+                    if(public_message_ready){
+                        out.writeBytes("__message\n");
+                        Thread.sleep(50);
+                        out.writeBytes(public_message + '\n');
+                        public_message_ready = false;
+                    }
+
                     if(in.ready()) {
                         switch (in.readLine()){
                             case "__get_users":
@@ -118,10 +126,24 @@ public class Server {
 
                                 for(String name: connected_clients.values()){
                                     out.writeBytes(name + '\n');
-                                    System.out.println(name);
                                 }
 
                                 out.writeBytes("__finished" + '\n');
+                                break;
+
+                            case "__message":
+                                public_message_ready = true;
+
+                                boolean message_recieved = false;
+
+                                while (!message_recieved) {
+                                    if (in.ready()) {
+                                        public_message = in.readLine();
+                                        message_recieved = true;
+                                    }
+                                    Thread.sleep(50);
+                                }
+
                                 break;
 
                             case "__kill":
@@ -129,7 +151,7 @@ public class Server {
                                 break;
                         }
                     }
-                    Thread.sleep(500);
+                    Thread.sleep(50);
                 }
             }
             catch(Exception e){}
@@ -149,7 +171,7 @@ public class Server {
                         Socket clientSocket = my_server.accept();
                         Single_Client_Server single = new Single_Client_Server(clientSocket);
                         single.start();
-                        Thread.sleep(500);
+                        Thread.sleep(50);
                     }
 
                     my_server.close();

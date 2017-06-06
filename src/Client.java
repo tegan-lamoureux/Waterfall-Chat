@@ -76,6 +76,8 @@ public class Client {
                     while (alive) {
                         if(message_waiting){
                             message_waiting = false;
+                            out_to_server.writeBytes("__message\n");
+                            Thread.sleep(50);
                             out_to_server.writeBytes(message + '\n');
                             message = "";
                             System.out.println("Cleared message.");
@@ -98,13 +100,26 @@ public class Client {
                                     }
                                     break;
 
+                                case "__message":
+                                    // TODO: add timeout
+                                    boolean message_recieved = false;
+
+                                    while (!message_recieved) {
+                                        if (in_from_server.ready()) {
+                                            messages_pane.setText(messages_pane.getText() + '\n' + in_from_server.readLine());
+                                            message_recieved = true;
+                                        }
+                                        Thread.sleep(50);
+                                    }
+                                    break;
+
                                 case "__kill":
                                     alive = false;
                                     break;
                             }
                         }
 
-                        Thread.sleep(500);
+                        Thread.sleep(50);
 
                         out_to_server.writeBytes("__get_users\n");
                     }

@@ -1,4 +1,5 @@
 import javax.swing.*;
+import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.BufferedReader;
@@ -10,6 +11,13 @@ import java.io.IOException;
 /**
  * Created by tegan on 5/11/2017.
  */
+
+//TODO 1. order the users alphabetically
+//TODO 2. get scrolling working (on user pane now), and fix double send issue
+//TODO 3. get PM working
+//TODO 4. get user history working
+//TODO 5. get username display in chat working
+//TODO 6. get login/new user window up and running
 
 public class Client {
     ////////////////////////////////////////////////////
@@ -26,9 +34,14 @@ public class Client {
         public void keyPressed(KeyEvent e) {
             if(e.getKeyChar() == '\n'){
                 e.consume(); // get rid of my return so it doesn't muck up my send field
+
+                messages_pane.setRows(1 + messages_pane.getRows());
                 message_waiting = true;
                 message = send_pane.getText();
                 send_pane.setText("");
+
+                messages_pane.append('\n' + message);
+                messages_pane.selectAll();
             }
         }
 
@@ -43,11 +56,12 @@ public class Client {
     ////////////////////////////////////////////////////
     // SWING Window Components   ///////////////////////
     ////////////////////////////////////////////////////
-    private JFrame    messages_window = new JFrame("Chat Window"); // Jframe for main window.
-    private JTextPane messages_pane   = new JTextPane(); // Main messages pane.
-    private JTextPane send_pane       = new JTextPane(); // Text box to send messages.
-    private JTextPane user_pane       = new JTextPane(); // User list.
-    private JMenuBar  main_menu       = new JMenuBar();  // Main menu bar.
+    private JFrame      messages_window = new JFrame("Chat Window"); // Jframe for main window.
+    private JTextArea   messages_pane   = new JTextArea(); // Main messages pane.
+    private JScrollPane messages_scroll = null;            // set up during window creation
+    private JTextPane   send_pane       = new JTextPane(); // Text box to send messages.
+    private JTextPane   user_pane       = new JTextPane(); // User list.
+    private JMenuBar    main_menu       = new JMenuBar();  // Main menu bar.
 
 
 
@@ -77,7 +91,7 @@ public class Client {
                         if(message_waiting){
                             message_waiting = false;
                             out_to_server.writeBytes("__message\n");
-                            Thread.sleep(50);
+                            Thread.sleep(100);
                             out_to_server.writeBytes(message + '\n');
                             message = "";
                             System.out.println("Cleared message.");
@@ -102,14 +116,15 @@ public class Client {
 
                                 case "__message":
                                     // TODO: add timeout
-                                    boolean message_recieved = false;
+                                    boolean message_received = false;
 
-                                    while (!message_recieved) {
+                                    while (!message_received) {
                                         if (in_from_server.ready()) {
-                                            messages_pane.setText(messages_pane.getText() + '\n' + in_from_server.readLine());
-                                            message_recieved = true;
+                                            messages_pane.append('\n' + in_from_server.readLine());
+                                            messages_pane.setRows(1 + messages_pane.getRows());
+                                            message_received = true;
                                         }
-                                        Thread.sleep(50);
+                                        Thread.sleep(100);
                                     }
                                     break;
 
@@ -118,8 +133,7 @@ public class Client {
                                     break;
                             }
                         }
-
-                        Thread.sleep(50);
+                        Thread.sleep(100);
 
                         out_to_server.writeBytes("__get_users\n");
                     }
@@ -157,20 +171,26 @@ public class Client {
         //Set up the content pane.
         Container pane = messages_window.getContentPane();
 
-        messages_pane.setPreferredSize(new Dimension(450, 300));
+        messages_pane.setPreferredSize(new Dimension(200, 300));
         messages_pane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createTitledBorder("Messages"),
                         BorderFactory.createEmptyBorder(5,5,5,5)),
                 messages_pane.getBorder()));
         messages_pane.setEditable(false);
-        if(this.connected == false) {
+        if(!this.connected) {
             messages_pane.setText("Disconnected. Please log in.");
         }
-        pane.add(messages_pane, BorderLayout.CENTER);
+
+        DefaultCaret caret = (DefaultCaret)messages_pane.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+
+        messages_scroll = new JScrollPane(messages_pane);
+
+        pane.add(messages_scroll, BorderLayout.CENTER);
 
         // TODO: working on getting messages pane to scroll correctly.
-        messages_window.setPreferredSize(new Dimension(450, 300));
+        messages_window.setPreferredSize(new Dimension(600, 375));
 
         user_pane.setPreferredSize(new Dimension(150, 300));
         user_pane.setBorder(BorderFactory.createCompoundBorder(

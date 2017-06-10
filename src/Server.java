@@ -113,7 +113,7 @@ public class Server {
                 while(alive) {
                     if(public_message_ready){
                         out.writeBytes("__message\n");
-                        Thread.sleep(50);
+                        Thread.sleep(100);
                         out.writeBytes(public_message + '\n');
                         public_message_ready = false;
                     }
@@ -141,7 +141,7 @@ public class Server {
                                         public_message = in.readLine();
                                         message_recieved = true;
                                     }
-                                    Thread.sleep(50);
+                                    Thread.sleep(100);
                                 }
 
                                 break;
@@ -151,7 +151,7 @@ public class Server {
                                 break;
                         }
                     }
-                    Thread.sleep(50);
+                    Thread.sleep(100);
                 }
             }
             catch(Exception e){}
@@ -171,7 +171,7 @@ public class Server {
                         Socket clientSocket = my_server.accept();
                         Single_Client_Server single = new Single_Client_Server(clientSocket);
                         single.start();
-                        Thread.sleep(50);
+                        Thread.sleep(100);
                     }
 
                     my_server.close();

@@ -106,28 +106,35 @@ public class Server {
 
                 boolean alive = true;
 
+                String username;
+                String password;
+
                 while(alive) {
                     if(public_message_ready){
                         out.writeBytes("__message\n");
+                        out.flush();
                         Thread.sleep(100);
                         out.writeBytes(public_message + '\n');
+                        out.flush();
                         public_message_ready = false;
                     }
 
                     if(in.ready()) {
                         switch (in.readLine()){
                             case "__get_users":
-                                //System.out.println("in case");
                                 out.writeBytes("__user_list" + '\n');
-
+                                out.flush();
                                 for(String name: connected_clients.values()){
                                     out.writeBytes(name + '\n');
+                                    out.flush();
                                 }
 
                                 out.writeBytes("__finished" + '\n');
+                                out.flush();
                                 break;
 
                             case "__message":
+                                System.out.println("in message");
                                 public_message_ready = true;
 
                                 boolean message_recieved = false;
@@ -140,6 +147,49 @@ public class Server {
                                     Thread.sleep(100);
                                 }
 
+                                break;
+
+                            case "__new_account":
+                                System.out.println("in new acct");
+                                username = null;
+                                password = null;
+
+                                while(!in.ready()) {
+                                    Thread.sleep(10);
+                                }
+                                username = in.readLine();
+
+                                while(!in.ready()) {
+                                    Thread.sleep(10);
+                                }
+                                password = in.readLine();
+
+                                create_user_account(username, password);
+
+                                System.out.println("New Account Created for " + username + ".");
+                                break;
+
+                            case "__login":
+                                System.out.println("in login");
+                                username = null;
+                                password = null;
+
+                                while(!in.ready()) {
+                                    Thread.sleep(10);
+                                }
+                                username = in.readLine();
+
+                                while(!in.ready()) {
+                                    Thread.sleep(10);
+                                }
+                                password = in.readLine();
+
+                                if(user_account_list.get(username).check_password(password))
+                                    out.writeBytes("__valid_credentials" + '\n');
+                                else
+                                    out.writeBytes("__invalid_credentials" + '\n');
+
+                                // broadcast login message here -- message = "User " + username.getText() + " has logged on!";
                                 break;
 
                             case "__kill":

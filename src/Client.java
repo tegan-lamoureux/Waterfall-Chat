@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.io.IOException;
+import java.util.Vector;
 
 /**
  * Created by Tegan on 5/11/2017.
@@ -16,27 +17,31 @@ import java.io.IOException;
  * for my chat is here.
  */
 
-//TODO 1. order the users alphabetically
-//TODO 2. get scrolling working (on user pane now), and fix double send issue
+//TODO 6. get login/new user window up and running
+//TODO 2. fix double send issue
 //TODO 3. get PM working
 //TODO 4. get user history working
 //TODO 5. get username display in chat working
-//TODO 6. get login/new user window up and running
+//TODO 7: get user to logout at window close
 
 public class Client {
 
     //region ////////// Private Class Variables //////////
     //////////////////////////////////////////////////////
+    // Identity Variables
     private boolean connected = false;
     private boolean logged_in = false;
-    private boolean login_ready = false;
-    private int my_id = 0;
-    private String my_username;
 
-    private boolean message_waiting = false;
+    // Action Flags
+    private boolean action_login_ready     = false;
+    private boolean action_message_waiting = false;
+    private boolean action_create_account  = false;
+
+    // Misc. Variables
+    private int my_id = 0;
+    private String my_username = null;
     private String message;
     //endregion
-
 
     //region ////////// SWING Window Components //////////
     //////////////////////////////////////////////////////
@@ -45,12 +50,18 @@ public class Client {
     private JTextArea      messages_pane   = new JTextArea(); // Main messages pane.
     private JScrollPane    messages_scroll = null;            // set up during window creation
     private JTextPane      send_pane       = new JTextPane(); // Text box to send messages.
-    private JTextPane      user_pane       = new JTextPane(); // User list.
     private JMenuBar       main_menu       = new JMenuBar();  // Main menu bar.
     private JButton        login_button = null;
     private JButton        account_button = null;
     private JTextField     username = null;
     private JPasswordField password = null;
+    JTextField c_username  = null;
+    JTextField c_password  = null;
+    JTextField c_password2 = null;
+
+    DefaultListModel<String> users = new DefaultListModel<>();
+    JList<String> user_list = null;
+    JScrollPane scroll_users_list = null;
     //endregion
 
     //region ////////// Event Handler Classes ////////////
@@ -62,11 +73,11 @@ public class Client {
                 e.consume(); // get rid of my return so it doesn't muck up my send field
 
                 messages_pane.setRows(1 + messages_pane.getRows());
-                message_waiting = true;
+                action_message_waiting = true;
                 message = send_pane.getText();
                 send_pane.setText("");
 
-                messages_pane.append('\n' + message);
+                messages_pane.append('\n' + my_username + ": " + message);
                 messages_pane.selectAll();
             }
         }
@@ -80,38 +91,25 @@ public class Client {
     private class Login implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            login_button.setEnabled(false);
-            username.setEnabled(false);
-            password.setEnabled(false);
-            login_ready = true;
+            action_login_ready = true;
         }
     }
 
-    private class Account implements ActionListener {
+    private class Show_Create_Account implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            login_button.setEnabled(false);
-            username.setEnabled(false);
-            password.setEnabled(false);
-            login_ready = true;
-
             javax.swing.SwingUtilities.invokeLater(Client.this::create_account_window);
         }
     }
 
-    private class Create implements ActionListener {
+    private class Create_Account implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            //JOptionPane.showMessageDialog(null, "message here", "InfoBox: " + "title here", JOptionPane.INFORMATION_MESSAGE);
-            /*messages_pane.setRows(1 + messages_pane.getRows());
-            message_waiting = true;
-            message = send_pane.getText();
-            send_pane.setText("");
-
-            messages_pane.append('\n' + message);
-            messages_pane.selectAll();*/
-
-            //TODO: left off here, get account message to send to server
+            if(!c_password.getText().equals("") && c_password.getText().equals(c_password2.getText())) {
+                action_create_account = true;
+            }
+            else
+                JOptionPane.showMessageDialog(null, "Passwords must match and be not empty.", "Error", JOptionPane.INFORMATION_MESSAGE);
         }
     }
     //endregion
@@ -120,10 +118,12 @@ public class Client {
     public Client() {
         //Schedule a job for the event dispatch thread:
         //creating and showing this application's GUI
-
         Thread input_from_server_thread = new Thread(() -> {
             try {
                 boolean alive = true;
+                int user_timer = 0;
+
+                String command = null;
 
                 Socket socket = new Socket("localhost", 6789);
                 DataOutputStream out_to_server = new DataOutputStream(socket.getOutputStream());
@@ -131,58 +131,108 @@ public class Client {
 
                 connected = true;
 
+                // Main client loop.
                 while (alive) {
-                    if(logged_in) {
-                        if (message_waiting) {
-                            message_waiting = false;
-                            out_to_server.writeBytes("__message\n");
-                            Thread.sleep(100);
-                            out_to_server.writeBytes(message + '\n');
-                            message = "";
-                            System.out.println("Cleared message.");
+                    if(in_from_server.ready())
+                        command = in_from_server.readLine();
+
+                    if(command != null && command.equals("__message")) {
+                        while (!in_from_server.ready())
+                            Thread.sleep(1);
+
+                        String mess = in_from_server.readLine();
+
+                        if(!mess.equals("__message")) {
+                            messages_pane.append('\n' + mess);
+                            messages_pane.setRows(1 + messages_pane.getRows());
                         }
-
-                        if (in_from_server.ready()) {
-                            switch (in_from_server.readLine()) {
-                                case "__user_list":
-                                    String name = "";
-                                    user_pane.setText("");
-
-                                    // TODO: add timeout
-                                    while (!name.equals("__finished")) {
-                                        if (in_from_server.ready()) {
-                                            name = in_from_server.readLine();
-                                            if (!name.equals("__finished")) {
-                                                user_pane.setText(user_pane.getText() + name + '\n');
-                                            }
-                                        }
-                                    }
-                                    break;
-
-                                case "__message":
-                                    // TODO: add timeout
-                                    boolean message_received = false;
-
-                                    while (!message_received) {
-                                        if (in_from_server.ready()) {
-                                            messages_pane.append('\n' + in_from_server.readLine());
-                                            messages_pane.setRows(1 + messages_pane.getRows());
-                                            message_received = true;
-                                        }
-                                        Thread.sleep(100);
-                                    }
-                                    break;
-
-                                case "__kill":
-                                    alive = false;
-                                    break;
-                            }
-                        }
-
-                        out_to_server.writeBytes("__get_users\n");
                     }
-                    else{
-                        logged_in = true;
+
+                    if(command != null && command.equals("__kill")){
+                        alive = false;
+                    }
+
+                    // if we hit out update user timer..
+                    if(user_timer > 20) {
+                        out_to_server.writeBytes("__get_users\n");
+
+                        while (!in_from_server.ready())
+                            Thread.sleep(1);
+
+                        String temp = "";
+                        Vector<String> names = new Vector<>();
+
+                        // TODO: add timeout
+                        while (!temp.equals("__finished")) {
+                            if (in_from_server.ready()) {
+                                temp = in_from_server.readLine();
+                                if (!temp.equals("__finished") && !temp.equals("__user_list")) {
+                                    names.add(temp);
+                                }
+                            } else
+                                Thread.sleep(10);
+                        }
+
+                        for (String name : names)
+                            if (!users.contains(name))
+                                users.addElement(name);
+
+                        user_timer = 0;
+                    }
+                    else
+                        ++ user_timer;
+
+                    if (action_message_waiting) {
+                        action_message_waiting = false;
+                        out_to_server.writeBytes("__message\n");
+                        out_to_server.flush();
+                        Thread.sleep(100);
+                        out_to_server.writeBytes(my_username + ": " + message + '\n');
+                        out_to_server.flush();
+                        message = "";
+                        System.out.println("Cleared message.");
+                    }
+
+                    if (action_create_account) {
+                        action_create_account = false;
+                        out_to_server.writeBytes("__new_account\n");
+                        out_to_server.flush();
+                        Thread.sleep(100);
+                        out_to_server.writeBytes(c_username.getText() + '\n');
+                        out_to_server.flush();
+                        Thread.sleep(100);
+                        out_to_server.writeBytes(c_password.getText() + '\n');
+                        out_to_server.flush();
+
+                        JOptionPane.showMessageDialog(null, "New account created for " + c_username.getText() + "!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                    }
+
+                    if (action_login_ready) {
+                        action_login_ready = false;
+
+                        out_to_server.writeBytes("__login\n");
+                        out_to_server.flush();
+                        Thread.sleep(10);
+                        out_to_server.writeBytes(username.getText() + '\n');
+                        out_to_server.flush();
+                        Thread.sleep(10);
+                        out_to_server.writeBytes(password.getText() + '\n');
+                        out_to_server.flush();
+
+                        while (!in_from_server.ready())
+                            Thread.sleep(10);
+
+                        String valid = in_from_server.readLine();
+                        System.out.println(valid);
+                        if (valid.equals("__valid_credentials")) {
+                            login_button.setEnabled(false);
+                            username.setEnabled(false);
+                            password.setEnabled(false);
+                            this.my_username = username.getText();
+                            JOptionPane.showMessageDialog(null, "WORKS.", "Warning", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(null, "Login credentials are not valid.", "Warning", JOptionPane.INFORMATION_MESSAGE);
+                        }
                     }
 
                     Thread.sleep(100);
@@ -192,9 +242,9 @@ public class Client {
             catch (Exception e) {}
         });
 
-        input_from_server_thread.start();
-
         javax.swing.SwingUtilities.invokeLater(this::create_main_window);
+
+        input_from_server_thread.start();
     }
 
     public Client(int client_id) throws IOException{
@@ -209,6 +259,7 @@ public class Client {
     private void create_main_window(){
         // I need a place for login credentials at the top. If valid, logs in, if invalid, shows the new user
         // window signup.
+
 
         //Create and set up the window.
         messages_window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -225,7 +276,7 @@ public class Client {
         password = new JPasswordField(10);
 
         login_button.addActionListener(new Login());
-        account_button.addActionListener(new Account());
+        account_button.addActionListener(new Show_Create_Account());
 
         login.add(new JLabel("Username:"));
         login.add(username);
@@ -240,11 +291,7 @@ public class Client {
 
 
         messages_pane.setPreferredSize(new Dimension(200, 300));
-        messages_pane.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createTitledBorder("Messages"),
-                        BorderFactory.createEmptyBorder(5,5,5,5)),
-                messages_pane.getBorder()));
+
         messages_pane.setEditable(false);
         if(!this.connected) {
             messages_pane.setText("Disconnected. Please log in.");
@@ -254,19 +301,33 @@ public class Client {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
         messages_scroll = new JScrollPane(messages_pane);
+        messages_scroll.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createTitledBorder("Messages"),
+                        BorderFactory.createEmptyBorder(5,5,5,5)),
+                messages_pane.getBorder()));
 
         pane.add(messages_scroll, BorderLayout.CENTER);
 
         // TODO: working on getting messages pane to scroll correctly.
         messages_window.setPreferredSize(new Dimension(600, 375));
 
-        user_pane.setPreferredSize(new Dimension(150, 300));
-        user_pane.setBorder(BorderFactory.createCompoundBorder(
+        // setup user list
+        user_list = new JList<>(users);
+
+        user_list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        user_list.setLayoutOrientation(JList.VERTICAL);
+        user_list.setVisibleRowCount(-1);
+
+        scroll_users_list = new JScrollPane(user_list);
+        scroll_users_list.setPreferredSize(new Dimension(150, 300));
+        scroll_users_list.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createTitledBorder("Users"),
                         BorderFactory.createEmptyBorder(5,5,5,5)),
-                user_pane.getBorder()));
-        pane.add(user_pane, BorderLayout.LINE_END);
+                scroll_users_list.getBorder()));
+
+        pane.add(scroll_users_list, BorderLayout.LINE_END);
 
         send_pane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
@@ -302,11 +363,11 @@ public class Client {
         login.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
 
         JButton create = new JButton("Create Account");
-        JTextField c_username  = new JTextField(15);
-        JTextField c_password  = new JPasswordField();
-        JTextField c_password2 = new JPasswordField();
+        c_username  = new JTextField();
+        c_password  = new JPasswordField();
+        c_password2 = new JPasswordField();
 
-        create.addActionListener(new Create());
+        create.addActionListener(new Create_Account());
 
         login.add(new JLabel("Username:"));
         login.add(c_username);

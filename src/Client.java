@@ -148,6 +148,23 @@ public class Client {
                         }
                     }
 
+                    if(command != null && command.equals("__message_private")) {
+                        while (!in_from_server.ready())
+                            Thread.sleep(1);
+
+                        String user = in_from_server.readLine();
+
+                        while (!in_from_server.ready())
+                            Thread.sleep(1);
+
+                        String mess = in_from_server.readLine();
+
+                        if(this.my_username.equals(user)) {
+                            messages_pane.append('\n' + "PRIVATE MESSAGE: " + mess);
+                            messages_pane.setRows(1 + messages_pane.getRows());
+                        }
+                    }
+
                     if(command != null && command.equals("__kill")){
                         alive = false;
                     }
@@ -173,9 +190,14 @@ public class Client {
                                 Thread.sleep(10);
                         }
 
-                        for (String name : names)
+                        for (String name : names) {
                             if (!users.contains(name))
                                 users.addElement(name);
+                        }
+
+                        for(int i = 0; i < users.size(); ++i)
+                            if(!names.contains(users.get(i)))
+                                users.remove(i);
 
                         user_timer = 0;
                     }
@@ -184,13 +206,28 @@ public class Client {
 
                     if (action_message_waiting) {
                         action_message_waiting = false;
-                        out_to_server.writeBytes("__message\n");
-                        out_to_server.flush();
-                        Thread.sleep(100);
-                        out_to_server.writeBytes(my_username + ": " + message + '\n');
-                        out_to_server.flush();
-                        message = "";
-                        System.out.println("Cleared message.");
+
+                        if(user_list.getMinSelectionIndex() == -1) {
+                            out_to_server.writeBytes("__message\n");
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(my_username + ": " + message + '\n');
+                            out_to_server.flush();
+                            message = "";
+                            System.out.println("Cleared message.");
+                        }
+                        else {
+                            out_to_server.writeBytes("__message_private\n");
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(my_username + ": " + message + '\n');
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(users.get(user_list.getMinSelectionIndex()) + '\n');
+                            out_to_server.flush();
+                            message = "";
+                            System.out.println("Cleared message.");
+                        }
                     }
 
                     if (action_create_account) {
@@ -210,28 +247,49 @@ public class Client {
                     if (action_login_ready) {
                         action_login_ready = false;
 
-                        out_to_server.writeBytes("__login\n");
-                        out_to_server.flush();
-                        Thread.sleep(10);
-                        out_to_server.writeBytes(username.getText() + '\n');
-                        out_to_server.flush();
-                        Thread.sleep(10);
-                        out_to_server.writeBytes(password.getText() + '\n');
-                        out_to_server.flush();
+                        if(!logged_in) {
+                            out_to_server.writeBytes("__login\n");
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(username.getText() + '\n');
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(password.getText() + '\n');
+                            out_to_server.flush();
 
-                        while (!in_from_server.ready())
-                            Thread.sleep(10);
+                            while (!in_from_server.ready())
+                                Thread.sleep(10);
 
-                        String valid = in_from_server.readLine();
-                        System.out.println(valid);
-                        if (valid.equals("__valid_credentials")) {
-                            login_button.setEnabled(false);
-                            username.setEnabled(false);
-                            password.setEnabled(false);
-                            this.my_username = username.getText();
-                            JOptionPane.showMessageDialog(null, "WORKS.", "Warning", JOptionPane.INFORMATION_MESSAGE);
-                        } else {
-                            JOptionPane.showMessageDialog(null, "Login credentials are not valid.", "Warning", JOptionPane.INFORMATION_MESSAGE);
+                            String valid = in_from_server.readLine();
+                            System.out.println(valid);
+                            if (valid.equals("__valid_credentials")) {
+                                username.setEnabled(false);
+                                password.setEnabled(false);
+                                this.my_username = username.getText();
+                                this.logged_in = true;
+                            } else {
+                                JOptionPane.showMessageDialog(null, "Login credentials are not valid.", "Warning", JOptionPane.INFORMATION_MESSAGE);
+                            }
+                        }
+                        else{
+                            out_to_server.writeBytes("__logout\n");
+                            out_to_server.flush();
+                            Thread.sleep(100);
+                            out_to_server.writeBytes(username.getText() + '\n');
+                            out_to_server.flush();
+                            Thread.sleep(100);
+
+                            while (!in_from_server.ready())
+                                Thread.sleep(10);
+
+                            String valid = in_from_server.readLine();
+                            System.out.println(valid);
+                            if (valid.equals("__valid_credentials")) {
+                                username.setEnabled(true);
+                                password.setEnabled(true);
+                                this.my_username = "";
+                                this.logged_in = false;
+                            }
                         }
                     }
 
@@ -314,8 +372,31 @@ public class Client {
 
         // setup user list
         user_list = new JList<>(users);
+        user_list.setSelectionModel(new DefaultListSelectionModel() {
+            private static final long serialVersionUID = 1L;
 
-        user_list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            boolean gestureStarted = false;
+
+            @Override
+            public void setSelectionInterval(int index0, int index1) {
+                if(!gestureStarted){
+                    if (isSelectedIndex(index0)) {
+                        super.removeSelectionInterval(index0, index1);
+                    } else {
+                        super.addSelectionInterval(index0, index1);
+                    }
+                }
+                gestureStarted = true;
+            }
+
+            @Override
+            public void setValueIsAdjusting(boolean isAdjusting) {
+                if (isAdjusting == false) {
+                    gestureStarted = false;
+                }
+            }
+        });
+
         user_list.setLayoutOrientation(JList.VERTICAL);
         user_list.setVisibleRowCount(-1);
 

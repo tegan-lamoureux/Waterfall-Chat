@@ -14,14 +14,10 @@ public class Manager {
 
         int number_clients = input.nextInt();
 
-        for(int i = 0; i < number_clients; ++i){
-            test_server.create_user_account("test_user" + i, "test_password");
-        }
-
         Vector<Client> clients = new Vector<>();
 
         for(int i = 0; i < number_clients; ++i){
-            clients.add(new Client(test_server.login("test_user" + i, "test_password")));
+            clients.add(new Client());
         }
     }
 }

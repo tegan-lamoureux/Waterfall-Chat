@@ -21,13 +21,17 @@ public class Server {
     // on the server (user account list; hashed by username to user account), and one to keep a
     // list of currently logged in users (connected clients; hashed by client ID to username).
     private ConcurrentHashMap<String, User_Account> user_account_list = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, String >     connected_clients = new ConcurrentHashMap<>();
+    private Vector<String> connected_clients = new Vector<>();
 
     // Main server socket; used when clients connect.
     private ServerSocket my_server = null;
 
     private boolean public_message_ready = false;
     private String public_message;
+
+    private boolean private_message_ready = false;
+    private String private_message;
+    private String private_user;
 
     ////////////////////////////////////////////////////
     // Private Sub-Classes and Constructors   //////////
@@ -64,7 +68,8 @@ public class Server {
         }
 
         public boolean check_password(String password){
-            return (password == this.password);
+            System.out.println("in here");
+            return (password.equals(this.password));
         }
 
         public String get_username(){
@@ -119,12 +124,24 @@ public class Server {
                         public_message_ready = false;
                     }
 
+                    if(private_message_ready){
+                        out.writeBytes("__message_private\n");
+                        out.flush();
+                        Thread.sleep(100);
+                        out.writeBytes(private_user + '\n');
+                        out.flush();
+                        Thread.sleep(100);
+                        out.writeBytes(private_message + '\n');
+                        out.flush();
+                        private_message_ready = false;
+                    }
+
                     if(in.ready()) {
                         switch (in.readLine()){
                             case "__get_users":
                                 out.writeBytes("__user_list" + '\n');
                                 out.flush();
-                                for(String name: connected_clients.values()){
+                                for(String name: connected_clients){
                                     out.writeBytes(name + '\n');
                                     out.flush();
                                 }
@@ -146,7 +163,28 @@ public class Server {
                                     }
                                     Thread.sleep(100);
                                 }
+                                break;
 
+                            case "__message_private":
+                                private_message_ready = true;
+
+                                message_recieved = false;
+                                while (!message_recieved) {
+                                    if (in.ready()) {
+                                        private_message = in.readLine();
+                                        message_recieved = true;
+                                    }
+                                    Thread.sleep(100);
+                                }
+
+                                message_recieved = false;
+                                while (!message_recieved) {
+                                    if (in.ready()) {
+                                        private_user = in.readLine();
+                                        message_recieved = true;
+                                    }
+                                    Thread.sleep(100);
+                                }
                                 break;
 
                             case "__new_account":
@@ -170,7 +208,6 @@ public class Server {
                                 break;
 
                             case "__login":
-                                System.out.println("in login");
                                 username = null;
                                 password = null;
 
@@ -184,12 +221,41 @@ public class Server {
                                 }
                                 password = in.readLine();
 
-                                if(user_account_list.get(username).check_password(password))
-                                    out.writeBytes("__valid_credentials" + '\n');
-                                else
-                                    out.writeBytes("__invalid_credentials" + '\n');
+                                Random random = new Random();
 
-                                // broadcast login message here -- message = "User " + username.getText() + " has logged on!";
+                                if(user_account_list != null &&
+                                        user_account_list.containsKey(username) &&
+                                        user_account_list.get(username).check_password(password) &&
+                                        !connected_clients.contains(username)) {
+                                    out.writeBytes("__valid_credentials" + '\n');
+                                    public_message_ready = true;
+                                    public_message = "User " + username + " has logged on!\n";
+                                    connected_clients.add(username);
+                                }
+                                else {
+                                    out.writeBytes("__invalid_credentials" + '\n');
+                                }
+                                break;
+
+                            case "__logout":
+                                username = null;
+
+                                while(!in.ready()) {
+                                    Thread.sleep(10);
+                                }
+                                username = in.readLine();
+
+                                if(user_account_list != null &&
+                                        user_account_list.containsKey(username) &&
+                                        connected_clients.contains(username)) {
+                                    out.writeBytes("__valid_credentials" + '\n');
+                                    public_message_ready = true;
+                                    public_message = "User " + username + " has logged off!\n";
+                                    connected_clients.remove(username);
+                                }
+                                else {
+                                    out.writeBytes("__invalid_credentials" + '\n');
+                                }
                                 break;
 
                             case "__kill":
@@ -234,11 +300,6 @@ public class Server {
     // Server Methods    ///////////////////////////////
     ////////////////////////////////////////////////////
 
-    // converted to int instead of bool, update required code
-    public boolean check_client_connected(int client_id){
-        return connected_clients.containsKey(client_id);
-    }
-
     public boolean check_user_exists(String username){
         return user_account_list.containsKey(username);
     }
@@ -247,7 +308,7 @@ public class Server {
         String[] users = new String[connected_clients.size()];
 
         int i = 0;
-        for(String username: connected_clients.values()){
+        for(String username: connected_clients){
             users[i++] = username;
         }
 
@@ -263,57 +324,6 @@ public class Server {
             return false;
     }
 
-    public int login(String username, String password){
-        boolean user_exists = user_account_list.containsKey(username);
-        boolean valid_credentials = user_account_list.get(username).check_password(password);
-
-        // if the user exists in the account database and the password matches the stored password, then proceed
-        if(user_exists && valid_credentials) {
-            Random random = new Random();
-
-            int client_id = random.nextInt(999999) + 100000;
-            boolean valid_id = false;
-
-            // Loop through all of our connected clients and check to see if the new client ID is unique.
-            // If so, great, use it. If not, generate a new one and restart the search.
-            while (!valid_id) {
-                if (connected_clients.containsKey(client_id)) {
-                    client_id = random.nextInt(999999) + 100000;
-                }
-                else {
-                    valid_id = true;
-                }
-            }
-
-            System.out.println("Test; clid generated: " + client_id);
-
-            // now that we have a valid client id, let's add it to the list of connected clients...
-            connected_clients.putIfAbsent(client_id, username);
-
-            // and update the user account info
-            user_account_list.get(username).connect(client_id);
-
-            return client_id;
-        }
-        else if(user_exists) // password doesn't match
-            return -1;
-        else // user doesn't exist
-            return -2;
-    }
-
-    public boolean disconnect(int client_id){
-        String username = null;
-
-        if(connected_clients.containsKey(client_id)){
-            username = connected_clients.get(client_id);
-            connected_clients.remove(client_id);
-            user_account_list.get(username).disconnect();
-
-            return true;
-        }
-        else
-            return false;
-    }
 
     public boolean send_all(int client_id, String message){
         // send a message here
